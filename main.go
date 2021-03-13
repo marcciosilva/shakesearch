@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
+	"sync"
 
 	"pulley.com/shakesearch/internal/html"
 	"pulley.com/shakesearch/internal/search"
@@ -52,13 +54,38 @@ func getSearchHandler(searcher search.Searcher) func(w http.ResponseWriter, r *h
 			writeBytesToResponseWriter(w, []byte("missing search query in URL params"))
 			return
 		}
-		searchedText := query[0]
+		searchedText := strings.Split(query[0], " ")
+		// TODO: create package for text manipulation, trimming and whatnot
 
-		resultsByMatchedToken, prioritizedMatchingTokens := searcher.Search(searchedText)
-		results := html.AdaptTextForHTML(resultsByMatchedToken, prioritizedMatchingTokens)
+		resultsBySearchedToken := make(map[string][]string)
+		resultsMutex := &sync.RWMutex{}
+		wg := sync.WaitGroup{}
+		// TODO: support matching entire search?
+		//wg.Add(1)
+		//go getResultsForSearchedTextToken(searcher, query[0], resultsBySearchedToken, resultsMutex, &wg)
+		for _, searchedTextToken := range searchedText {
+			wg.Add(1)
+			go getResultsForSearchedTextToken(searcher, searchedTextToken, resultsBySearchedToken, resultsMutex, &wg)
+		}
+		wg.Wait()
 
+		results := make([]string, 0)
+		for _, searchedTextToken := range searchedText {
+			results = append(results, resultsBySearchedToken[searchedTextToken]...)
+		}
 		writeSearchResults(w, results)
 	}
+}
+
+func getResultsForSearchedTextToken(searcher search.Searcher, searchedTextToken string,
+	resultsBySearchedToken map[string][]string, resultsMutex *sync.RWMutex, wg *sync.WaitGroup) {
+
+	defer wg.Done()
+	resultsByMatchedToken, prioritizedMatchingTokens := searcher.Search(searchedTextToken)
+	results := html.AdaptTextForHTML(resultsByMatchedToken, prioritizedMatchingTokens)
+	resultsMutex.Lock()
+	resultsBySearchedToken[searchedTextToken] = results
+	resultsMutex.Unlock()
 }
 
 func writeSearchResults(w http.ResponseWriter, results []string) {
