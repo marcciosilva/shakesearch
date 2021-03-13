@@ -60,7 +60,7 @@ func (s *ShakespeareSearcher) Search(query string) (map[string][]string, []strin
 }
 
 func (s *ShakespeareSearcher) getPrioritizedFuzzyMatchesForSearchQuery(query string) []string {
-	// matches the query to a token in the text only if said token includes all of the token's letters.
+	// matches the query (case insensitive) to a token in the text only if said token includes all of the token's letters.
 	// then ranks matches using Levenshtein distance.
 	matches := fuzzy.RankFindFold(query, s.Tokens)
 	sort.Sort(matches)
