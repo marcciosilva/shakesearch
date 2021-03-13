@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"pulley.com/shakesearch/internal/math"
@@ -88,6 +89,12 @@ func (s *ShakespeareSearcher) writeMatchingExcerptsForTokenToResult(tokenToSearc
 		maxTextIndex := math.Min(completeWorksLength, idx+250)
 		minTextIndex := math.Max(idx-250, 0)
 		excerpt := s.CompleteWorks[minTextIndex:maxTextIndex]
+		for index, rune := range excerpt {
+			if unicode.IsUpper(rune) {
+				excerpt = "..." + excerpt[index:] + "..."
+				break
+			}
+		}
 		resultsForToken = append(resultsForToken, excerpt)
 	}
 	resultsMutex.Lock()
