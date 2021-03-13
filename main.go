@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"pulley.com/shakesearch/internal/html"
 	"pulley.com/shakesearch/internal/search"
 )
 
@@ -51,7 +52,9 @@ func getSearchHandler(searcher search.Searcher) func(w http.ResponseWriter, r *h
 			writeBytesToResponseWriter(w, []byte("missing search query in URL params"))
 			return
 		}
-		results := searcher.Search(query[0])
+		searchedText := query[0]
+		results := searcher.Search(searchedText)
+		html.AdaptTextForHTML(searchedText, results)
 		buf := &bytes.Buffer{}
 		enc := json.NewEncoder(buf)
 		err := enc.Encode(results)
