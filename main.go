@@ -45,7 +45,10 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 		query, ok := r.URL.Query()["q"]
 		if !ok || len(query[0]) < 1 {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("missing search query in URL params"))
+			_, err := w.Write([]byte("missing search query in URL params"))
+			if err != nil {
+				log.Fatalf("failed to write to response writer: %v", err)
+			}
 			return
 		}
 		results := searcher.Search(query[0])
@@ -54,11 +57,17 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 		err := enc.Encode(results)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("encoding failure"))
+			_, err = w.Write([]byte("encoding failure"))
+			if err != nil {
+				log.Fatalf("failed to write to response writer: %v", err)
+			}
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(buf.Bytes())
+		_, err = w.Write(buf.Bytes())
+		if err != nil {
+			log.Fatalf("failed to write to response writer: %v", err)
+		}
 	}
 }
 
