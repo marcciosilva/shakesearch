@@ -53,19 +53,25 @@ func getSearchHandler(searcher search.Searcher) func(w http.ResponseWriter, r *h
 			return
 		}
 		searchedText := query[0]
-		results := searcher.Search(searchedText)
-		html.AdaptTextForHTML(searchedText, results)
-		buf := &bytes.Buffer{}
-		enc := json.NewEncoder(buf)
-		err := enc.Encode(results)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			writeBytesToResponseWriter(w, []byte("encoding failure"))
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		writeBytesToResponseWriter(w, buf.Bytes())
+
+		resultsByMatchedToken, prioritizedMatchingTokens := searcher.Search(searchedText)
+		results := html.AdaptTextForHTML(resultsByMatchedToken, prioritizedMatchingTokens)
+
+		writeSearchResults(w, results)
 	}
+}
+
+func writeSearchResults(w http.ResponseWriter, results []string) {
+	buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
+	err := enc.Encode(results)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeBytesToResponseWriter(w, []byte("encoding failure"))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	writeBytesToResponseWriter(w, buf.Bytes())
 }
 
 func writeBytesToResponseWriter(w http.ResponseWriter, bytes []byte) {
