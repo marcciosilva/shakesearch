@@ -4,51 +4,51 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"index/suffixarray"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+
+	"pulley.com/shakesearch/internal/search"
+)
+
+const (
+	defaultAppHttpPort                         = "3001"
+	portEnvVariableKey                         = "PORT"
+	searchQueryParamKey                        = "q"
+	shakespeareCompleteWorksPathEnvVariableKey = "SHAKESPEARE_COMPLETE_WORKS_PATH"
 )
 
 func main() {
-	searcher := Searcher{}
-	err := searcher.Load("completeworks.txt")
+	workingDirectory, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to get working directory: %v", err)
 	}
-
-	fs := http.FileServer(http.Dir("./static"))
-	http.Handle("/", fs)
-
-	http.HandleFunc("/search", handleSearch(searcher))
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3001"
-	}
-
-	fmt.Printf("Listening on port %s...", port)
-	err = http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
+	shakespeareCompleteWorksPath := fmt.Sprintf("%s/internal/search/resources/completeworks.txt", workingDirectory)
+	err = os.Setenv(shakespeareCompleteWorksPathEnvVariableKey, shakespeareCompleteWorksPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to set env variable for Shakespeare's complete works' path: %v", err)
 	}
+	searcher, err := search.CreateNewSearcher(shakespeareCompleteWorksPathEnvVariableKey)
+	if err != nil {
+		log.Fatalf("failed to create searcher: %v", err)
+	}
+	fileServer := http.FileServer(http.Dir("./static"))
+
+	handleApiRoutes(searcher, fileServer)
+	startApp()
 }
 
-type Searcher struct {
-	CompleteWorks string
-	SuffixArray   *suffixarray.Index
+func handleApiRoutes(searcher search.Searcher, fileServer http.Handler) {
+	http.HandleFunc("/search", getSearchHandler(searcher))
+	http.Handle("/", fileServer)
 }
 
-func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request) {
+func getSearchHandler(searcher search.Searcher) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		query, ok := r.URL.Query()["q"]
+		query, ok := r.URL.Query()[searchQueryParamKey]
 		if !ok || len(query[0]) < 1 {
 			w.WriteHeader(http.StatusBadRequest)
-			_, err := w.Write([]byte("missing search query in URL params"))
-			if err != nil {
-				log.Fatalf("failed to write to response writer: %v", err)
-			}
+			writeBytesToResponseWriter(w, []byte("missing search query in URL params"))
 			return
 		}
 		results := searcher.Search(query[0])
@@ -57,35 +57,29 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 		err := enc.Encode(results)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			_, err = w.Write([]byte("encoding failure"))
-			if err != nil {
-				log.Fatalf("failed to write to response writer: %v", err)
-			}
+			writeBytesToResponseWriter(w, []byte("encoding failure"))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, err = w.Write(buf.Bytes())
-		if err != nil {
-			log.Fatalf("failed to write to response writer: %v", err)
-		}
+		writeBytesToResponseWriter(w, buf.Bytes())
 	}
 }
 
-func (s *Searcher) Load(filename string) error {
-	dat, err := ioutil.ReadFile(filename)
+func writeBytesToResponseWriter(w http.ResponseWriter, bytes []byte) {
+	_, err := w.Write(bytes)
 	if err != nil {
-		return fmt.Errorf("Load: %w", err)
+		log.Fatalf("failed to write to response writer: %v", err)
 	}
-	s.CompleteWorks = string(dat)
-	s.SuffixArray = suffixarray.New(dat)
-	return nil
 }
 
-func (s *Searcher) Search(query string) []string {
-	idxs := s.SuffixArray.Lookup([]byte(query), -1)
-	results := []string{}
-	for _, idx := range idxs {
-		results = append(results, s.CompleteWorks[idx-250:idx+250])
+func startApp() {
+	port := os.Getenv(portEnvVariableKey)
+	if port == "" {
+		port = defaultAppHttpPort
 	}
-	return results
+	fmt.Printf("Listening on port %s...\n", port)
+	err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
