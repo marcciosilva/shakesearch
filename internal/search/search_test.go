@@ -79,19 +79,32 @@ func TestShakespeareSearcher_Search(t *testing.T) {
 		t.Errorf("failed to create new searcher: %v", err)
 	}
 	expectedResults := map[string][]string{
-		"majesty": {"to his new-appearing sight,\r\nServing with looks his sacred majesty,\r\nAnd having climbed the steep-up heavenly hill,\r\nResembling strong youth in his middle age,\r\nYet mortal looks adore his beauty still,\r\nAttending on his golden pilgrimage:\r\nBut when from highmost pitch with weary car,\r\nLike feeble age he reeleth from the day,\r\nThe eyes (fore duteous) now converted are\r\nFrom his low tract and look another way:\r\nSo thou, thy self out-going in thy noon:\r\nUnlooked on diest unless thou get a son.\n"},
-		"majsty":  {"sty,\r\nAnd having climbed the steep-up heavenly hill,\r\nResembling strong youth in his middle age,\r\nYet mortal looks adore his beauty still,\r\nAttending on his golden pilgrimage:\r\nBut when from highmost pitch with weary car,\r\nLike feeble age he reeleth from the day,\r\nThe eyes (fore duteous) now converted are\r\nFrom his low tract and look another way:\r\nSo thou, thy self out-going in thy noon:\r\nUnlooked on diest unless thou get a son."},
+		"from": {
+			"to his new-appearing sight,\r\nServing with looks his sacred majesty,\r\nAnd having climbed the steep-up heavenly hill,\r\nResembling strong youth in his middle age,\r\nYet mortal looks adore his beauty still,\r\nAttending on his golden pilgrimage:\r\nBut when from highmost pitch with weary car,\r\nLike feeble age he reeleth from the day,\r\nThe eyes (fore duteous) now converted are\r\nFrom his low tract and look another way:\r\nSo thou, thy self out-going in thy noon:\r\nUnlooked on diest unless thou get a son.\n",
+			"sty,\r\nAnd having climbed the steep-up heavenly hill,\r\nResembling strong youth in his middle age,\r\nYet mortal looks adore his beauty still,\r\nAttending on his golden pilgrimage:\r\nBut when from highmost pitch with weary car,\r\nLike feeble age he reeleth from the day,\r\nThe eyes (fore duteous) now converted are\r\nFrom his low tract and look another way:\r\nSo thou, thy self out-going in thy noon:\r\nUnlooked on diest unless thou get a son.",
+		},
+		"From": {
+			"From fairest creatures we desire increase,\r\nThat thereby beauty’s rose might never die,\r\nBut as the riper should by time decease,\r\nHis tender heir might bear his memory:\r\nBut thou contracted to thine own bright eyes,\r\nFeed’st thy light’s flame ",
+			"mbling strong youth in his middle age,\r\nYet mortal looks adore his beauty still,\r\nAttending on his golden pilgrimage:\r\nBut when from highmost pitch with weary car,\r\nLike feeble age he reeleth from the day,\r\nThe eyes (fore duteous) now converted are\r\nFrom his low tract and look another way:\r\nSo thou, thy self out-going in thy noon:\r\nUnlooked on diest unless thou get a son.\n",
+		},
 	}
 
-	resultsByMatchedToken, _ := searcher.Search("from")
+	resultsByMatchedToken, tokens := searcher.Search("from")
+	fmt.Println(tokens)
+
+	if len(expectedResults) != len(resultsByMatchedToken) {
+		t.Errorf("wanted %d results, got %d results", len(expectedResults), len(resultsByMatchedToken))
+	}
 
 	for token, result := range resultsByMatchedToken {
+
 		expectedResultsForToken := expectedResults[token]
-		trimCutSet := " \n\r"
+		trimCutSet := " \n\r" + invisibleUnicodeCharacterCutSet
 		for i := 0; i < len(expectedResultsForToken); i++ {
-			if strings.Trim(result[i], trimCutSet) != strings.Trim(expectedResultsForToken[i], trimCutSet) {
+			if strings.Trim(resultsByMatchedToken[token][i], trimCutSet) != strings.Trim(expectedResultsForToken[i], trimCutSet) {
 				t.Errorf("expected %v, got %v", expectedResultsForToken, result)
 			}
 		}
+
 	}
 }

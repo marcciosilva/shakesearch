@@ -13,7 +13,10 @@ import (
 	"pulley.com/shakesearch/internal/math"
 )
 
-const shakespeareCompleteWorksFilename = "resources/completeworks.txt"
+const (
+	shakespeareCompleteWorksFilename = "resources/completeworks.txt"
+	invisibleUnicodeCharacterCutSet  = "\uFEFF\u200B\u200D\u200C"
+)
 
 type Searcher interface {
 	Load(filename string) error
@@ -64,10 +67,11 @@ func (s *ShakespeareSearcher) getPrioritizedFuzzyMatchesForSearchQuery(query str
 	wasMatchUsedByToken := make(map[string]bool)
 	prioritizedTokens := make([]string, 0)
 	for _, match := range matches {
-		_, wasMatchUsed := wasMatchUsedByToken[match.Target]
+		tokenWithoutInvisibleCharacters := strings.Trim(match.Target, invisibleUnicodeCharacterCutSet)
+		_, wasMatchUsed := wasMatchUsedByToken[tokenWithoutInvisibleCharacters]
 		if !wasMatchUsed {
-			wasMatchUsedByToken[match.Target] = true
-			prioritizedTokens = append(prioritizedTokens, match.Target)
+			wasMatchUsedByToken[tokenWithoutInvisibleCharacters] = true
+			prioritizedTokens = append(prioritizedTokens, tokenWithoutInvisibleCharacters)
 		}
 	}
 	return prioritizedTokens
