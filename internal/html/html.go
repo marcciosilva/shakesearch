@@ -11,11 +11,14 @@ const (
 	highlightedHTMLTextFormat = "<mark>%s</mark>"
 )
 
-func AdaptTextForHTML(searchText string, text []string) {
-	highlightedHTMLSearchText := fmt.Sprintf(highlightedHTMLTextFormat, searchText)
-	for index, result := range text {
-		// TODO: support fuzzy search
-		replacer := strings.NewReplacer(searchText, highlightedHTMLSearchText, rawTextLineBreak, htmlBreak)
-		text[index] = replacer.Replace(result)
+func AdaptTextForHTML(textByToken map[string][]string, tokens []string) []string {
+	result := make([]string, 0)
+	for _, token := range tokens {
+		highlightedHTMLSearchToken := fmt.Sprintf(highlightedHTMLTextFormat, token)
+		replacer := strings.NewReplacer(token, highlightedHTMLSearchToken, rawTextLineBreak, htmlBreak)
+		for _, excerpt := range textByToken[token] {
+			result = append(result, replacer.Replace(excerpt))
+		}
 	}
+	return result
 }
