@@ -39,7 +39,7 @@ current state, can be deployed easily on Heroku's free tier.
 - Initial codebase refactor so that new changes would be supported (addition of interfaces, improvement of package structure, unit tests)
 - Improved result visualization (added HTML line breaks to what's sent to the frontend, highlights for searched text matches, text smoothing on the beginning and end of excerpts with '...')
 - Supported case insensitive search and fuzzy search (to cope with mispellings), by using [this package](https://github.com/lithammer/fuzzysearch)
-- Added Github actions pipeline to run CI on each Pull Request (worked only in this fashion), and managed to achieve a coverage of 100% in all packages other than main 
+- Added Github actions pipeline to run CI on each Pull Request (worked only in this fashion), and managed to achieve a coverage of 100% in all packages other than main. [Also hosted the app in Heroku](https://msilva-pulley-shakesearch.herokuapp.com/).
 
 ### Things I didn't have the time to do / solve in an optimal way:
 - Opted for not searching the complete text passed in the search bar - I split the search upon every whitespace and run an individual search for each token.
