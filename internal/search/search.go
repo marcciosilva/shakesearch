@@ -5,6 +5,7 @@ import (
 	"index/suffixarray"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -17,7 +18,10 @@ import (
 const (
 	shakespeareCompleteWorksFilename = "resources/completeworks.txt"
 	invisibleUnicodeCharacterCutSet  = "\uFEFF\u200B\u200D\u200C"
+	excerptSmoothingText             = "..."
 )
+
+var excerptEndingRegex = regexp.MustCompile(`([\r\n\s.]+$)`)
 
 type Searcher interface {
 	Load(filename string) error
@@ -89,17 +93,29 @@ func (s *ShakespeareSearcher) writeMatchingExcerptsForTokenToResult(tokenToSearc
 		maxTextIndex := math.Min(completeWorksLength, idx+250)
 		minTextIndex := math.Max(idx-250, 0)
 		excerpt := s.CompleteWorks[minTextIndex:maxTextIndex]
-		for index, rune := range excerpt {
-			if unicode.IsUpper(rune) {
-				excerpt = "..." + excerpt[index:] + "..."
-				break
-			}
-		}
+		excerpt = s.smoothExcerptStart(excerpt)
+		excerpt = s.smoothExcerptEnding(excerpt)
 		resultsForToken = append(resultsForToken, excerpt)
 	}
 	resultsMutex.Lock()
 	resultsByToken[tokenToSearchFor] = resultsForToken
 	resultsMutex.Unlock()
+}
+
+func (s *ShakespeareSearcher) smoothExcerptStart(excerpt string) string {
+	for index, char := range excerpt {
+		if unicode.IsUpper(char) {
+			excerpt = excerptSmoothingText + excerpt[index:]
+			break
+		}
+	}
+	return excerpt
+}
+
+func (s *ShakespeareSearcher) smoothExcerptEnding(excerpt string) string {
+	excerpt = excerptEndingRegex.ReplaceAllString(excerpt, "")
+	excerpt += excerptSmoothingText
+	return excerpt
 }
 
 func CreateNewSearcher(shakespeareCompleteWorksPathEnvVariableKey string) (*ShakespeareSearcher, error) {

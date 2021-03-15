@@ -19,6 +19,7 @@ const (
 	portEnvVariableKey                         = "PORT"
 	searchQueryParamKey                        = "q"
 	shakespeareCompleteWorksPathEnvVariableKey = "SHAKESPEARE_COMPLETE_WORKS_PATH"
+	shakespeareCompleteWorksPathFormat         = "%s/internal/search/resources/completeworks.txt"
 )
 
 func main() {
@@ -26,23 +27,24 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to get working directory: %v", err)
 	}
-	shakespeareCompleteWorksPath := fmt.Sprintf("%s/internal/search/resources/completeworks.txt", workingDirectory)
+	shakespeareCompleteWorksPath := fmt.Sprintf(shakespeareCompleteWorksPathFormat, workingDirectory)
 	err = os.Setenv(shakespeareCompleteWorksPathEnvVariableKey, shakespeareCompleteWorksPath)
 	if err != nil {
 		log.Fatalf("failed to set env variable for Shakespeare's complete works' path: %v", err)
 	}
+
+	handleApiRoutes()
+	startApp()
+}
+
+func handleApiRoutes() {
 	searcher, err := search.CreateNewSearcher(shakespeareCompleteWorksPathEnvVariableKey)
 	if err != nil {
 		log.Fatalf("failed to create searcher: %v", err)
 	}
-	fileServer := http.FileServer(http.Dir("./static"))
-
-	handleApiRoutes(searcher, fileServer)
-	startApp()
-}
-
-func handleApiRoutes(searcher search.Searcher, fileServer http.Handler) {
 	http.HandleFunc("/search", getSearchHandler(searcher))
+
+	fileServer := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fileServer)
 }
 
@@ -54,27 +56,23 @@ func getSearchHandler(searcher search.Searcher) func(w http.ResponseWriter, r *h
 			writeBytesToResponseWriter(w, []byte("missing search query in URL params"))
 			return
 		}
-		searchedText := strings.Split(query[0], " ")
-		// TODO: create package for text manipulation, trimming and whatnot
-
-		resultsBySearchedToken := make(map[string][]string)
-		resultsMutex := &sync.RWMutex{}
-		wg := sync.WaitGroup{}
-		// TODO: support matching entire search?
-		//wg.Add(1)
-		//go getResultsForSearchedTextToken(searcher, query[0], resultsBySearchedToken, resultsMutex, &wg)
-		for _, searchedTextToken := range searchedText {
-			wg.Add(1)
-			go getResultsForSearchedTextToken(searcher, searchedTextToken, resultsBySearchedToken, resultsMutex, &wg)
-		}
-		wg.Wait()
-
-		results := make([]string, 0)
-		for _, searchedTextToken := range searchedText {
-			results = append(results, resultsBySearchedToken[searchedTextToken]...)
-		}
+		searchedTokens := strings.Split(query[0], " ")
+		resultsBySearchedToken := getResultsBySearchedToken(searchedTokens, searcher)
+		results := groupTokenResults(searchedTokens, resultsBySearchedToken)
 		writeSearchResults(w, results)
 	}
+}
+
+func getResultsBySearchedToken(searchedText []string, searcher search.Searcher) map[string][]string {
+	resultsBySearchedToken := make(map[string][]string)
+	resultsMutex := &sync.RWMutex{}
+	wg := sync.WaitGroup{}
+	for _, searchedTextToken := range searchedText {
+		wg.Add(1)
+		go getResultsForSearchedTextToken(searcher, searchedTextToken, resultsBySearchedToken, resultsMutex, &wg)
+	}
+	wg.Wait()
+	return resultsBySearchedToken
 }
 
 func getResultsForSearchedTextToken(searcher search.Searcher, searchedTextToken string,
@@ -86,6 +84,14 @@ func getResultsForSearchedTextToken(searcher search.Searcher, searchedTextToken 
 	resultsMutex.Lock()
 	resultsBySearchedToken[searchedTextToken] = results
 	resultsMutex.Unlock()
+}
+
+func groupTokenResults(searchedText []string, resultsBySearchedToken map[string][]string) []string {
+	results := make([]string, 0)
+	for _, searchedTextToken := range searchedText {
+		results = append(results, resultsBySearchedToken[searchedTextToken]...)
+	}
+	return results
 }
 
 func writeSearchResults(w http.ResponseWriter, results []string) {
